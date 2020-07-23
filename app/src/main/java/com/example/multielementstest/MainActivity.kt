@@ -13,7 +13,7 @@ class MainActivity : AppCompatActivity(), MultiElementsRandLooper.MultiElementsR
 
     //
     val TAG = "MainActivity"
-    val loop = MultiElementsRandLooper()
+    lateinit var loop: MultiElementsRandLooper
     // called when loop is ready (we set MainActivity to be its listener in onCreate)
     override fun onMultiElementsRandLooperReady(loop: MultiElementsRandLooper) {
         Log.d(TAG, "Starting loop")
@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity(), MultiElementsRandLooper.MultiElementsR
         val flameUri = Uri.parse("android.resource://" + packageName + "/" + R.raw.candle)
         val thicknessUri = Uri.parse("android.resource://" + packageName + "/" + R.raw.candle)
         val blurUri = Uri.parse("android.resource://" + packageName + "/" + R.raw.blur7)
+        loop = MultiElementsRandLooper(stats)
         loop.addElement(this, flameUri, topLeftTex)
         loop.addElement(this, thicknessUri, bottomLeftTex)
         loop.addElement(this, blurUri, bottomRightTex)

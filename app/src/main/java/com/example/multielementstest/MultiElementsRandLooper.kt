@@ -7,31 +7,32 @@ import android.media.MediaExtractor
 import android.net.Uri
 import android.util.Log
 import android.view.TextureView
+import android.widget.TextView
 import kotlin.concurrent.thread
 
 
-class MultiElementsRandLooper(): TimeAnimator.TimeListener, Element.OnInitialisationListener {
+class MultiElementsRandLooper(_statsView: TextView): TimeAnimator.TimeListener, Element.OnInitialisationListener {
     final val TAG = "MultiElementsRandLooper"
     lateinit var listener: MultiElementsRandLooperInitialisedListener
-
+    val statsView = _statsView
     var duration: Long = 0
     var timer = TimeAnimator()
     var ticksCount = 0 // for debugging/stats, total times onTimeUpdate was called
-    var goodFrames = 0 // count of frames rendered with synchronised times
-    var badFrames = 0 // count of frames rendered that were erroneous (if needed?)
+    var totalTimeBetweenTicksThisSecond = 0 // debug stats
+    var secondsCount = 0 // debug stats - this is used to update stats view once a second
+    var lastTickTime: Long = 0 // debug stats
+    var goodFrames = 0 // debug stats = count of frames rendered with synchronised times
+    var catchingUpTicksThisSecond = 0 // debug stats - count of ticks in which the last-decoded frame is too early to present
     var elements = mutableListOf<Element>() // our video elements
     init {
         timer.setTimeListener(this)
     }
 
     override fun onTimeUpdate(animation: TimeAnimator?, totalTime: Long, deltaTime: Long) {
-        ticksCount++
-        if (goodFrames + badFrames == 30) {
-            // I want to do this on the GUI but for now just log:
-            Log.d(TAG, "Rendered " + goodFrames + " good and " + badFrames + " bad, time " + totalTime)
-            goodFrames = 0
-            badFrames = 0
-        }
+        // as the result of the expression can't be larger than 1000 (milliseconds in a second), int is fine
+        totalTimeBetweenTicksThisSecond = (totalTimeBetweenTicksThisSecond + (totalTime - lastTickTime)).toInt()
+        lastTickTime = totalTime
+
         var allOutputBuffersReady = true // used to render frames only when all are available
         for (e in elements) {
             if (e.extractorAdvanced) {
@@ -78,6 +79,7 @@ class MultiElementsRandLooper(): TimeAnimator.TimeListener, Element.OnInitialisa
                     Log.d(TAG, "Closer down other way is " + closerGoingDown(e.bufferInfo.presentationTimeUs / 1000, animationTime, duration))
                     return true
                 }
+                catchingUpTicksThisSecond++
                 Log.d(TAG, "outputBuffer " + e.outputBufferIndex + " bad to render, time " + (e.bufferInfo.presentationTimeUs / 1000) + ", animationTime " + animationTime)
 
                 return false
@@ -97,6 +99,24 @@ class MultiElementsRandLooper(): TimeAnimator.TimeListener, Element.OnInitialisa
 
             }
             goodFrames++;
+        }
+        // stats
+        ticksCount++
+        // if another second has rolled over...
+        if (secondsCount < totalTime / 1000) { // totalTime is in ms
+            // update counter
+            secondsCount++
+
+            statsView.text = "Seconds elapsed: " + secondsCount +
+                        "\nFrames per second: " + goodFrames +
+                        "\nTicks waiting for time to catch up: " + catchingUpTicksThisSecond +
+                        "\nTicks missed: " + (60 - ticksCount) +
+                        "\nAverage time between ticks: " + totalTimeBetweenTicksThisSecond / ticksCount
+
+            catchingUpTicksThisSecond = 0
+            totalTimeBetweenTicksThisSecond = 0
+            goodFrames = 0
+            ticksCount = 0
         }
 
     }
