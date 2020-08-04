@@ -1,5 +1,6 @@
 package com.example.multielementstest
 
+
 import android.animation.TimeAnimator
 import android.content.Context
 import android.media.MediaCodec
@@ -12,10 +13,10 @@ import android.widget.TextView
 import kotlin.concurrent.thread
 
 
-class MultiElementsRandLooper(_statsView: TextView, _layers: MutableList<Surface>, _invisibleLayers: MutableList<Surface>): TimeAnimator.TimeListener, Element.OnInitialisationListener {
-    final val TAG = "MultiElementsRandLooper"
+class ExtractorSwapTest(_statsView: TextView, _layers: MutableList<Surface>, _invisibleLayers: MutableList<Surface>): TimeAnimator.TimeListener, Element.OnInitialisationListener {
+    final val TAG = "ExtractorSwapTest"
 
-    private val GL_TEXTURE_EXTERNAL_OES = 0x8D65
+    //private val GL_TEXTURE_EXTERNAL_OES = 0x8D65
     private lateinit var readyListener: MultiElementsRandLooperInitialisedListener
     private lateinit var switchListener: SwitchListener
     val statsView = _statsView
@@ -29,9 +30,11 @@ class MultiElementsRandLooper(_statsView: TextView, _layers: MutableList<Surface
     var catchingUpTicksThisSecond = 0 // debug stats - count of ticks in which the last-decoded frame is too early to present
     var elements = mutableListOf<Element>() // our video elements
     var layers = _layers // the Surfaces that will display each layer of the composite
+    var invisibleLayers = _invisibleLayers
     // TEST HARD-CODING ****************
     var elementsA = mutableListOf<SimpleElement>()
     var elementsB = mutableListOf<SimpleElement>()
+    var playingA: Boolean = true
     // END TEST HARD-CODING ****************
     init {
         timer.setTimeListener(this)
@@ -43,11 +46,40 @@ class MultiElementsRandLooper(_statsView: TextView, _layers: MutableList<Surface
         lastTickTime = totalTime
 
         var allOutputBuffersReady = true // used to render frames only when all are available
-        for (e in elements) {
+        for (i in 0..(elementsA.size - 1)) {
+            val e = elementsA[i]
             if (e.extractorAdvanced) {
                 if (e.extractor.sampleFlags == -1) {
+                    /*
                     Log.d(TAG, "Extractor returned to start in element " + e.toString())
                     e.extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+
+                     */
+                    if (playingA) {
+                        // put it back to start before we put it away
+                        e.extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                        val temp = e.extractor
+                        e.extractor = elementsB[i].extractor
+                        elementsA[i].extractor = temp
+                        val temp2 = e.durationMillis
+                        e.durationMillis = elementsB[i].durationMillis
+                        elementsA[i].durationMillis = temp2
+                        playingA = false
+                        Log.d(TAG, "Switching to B's extractor and duration")
+                    }
+                    else {
+                        e.extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                        val temp = e.extractor
+                        e.extractor = elementsA[i].extractor
+                        elementsB[i].extractor = temp
+                        val temp2 = e.durationMillis
+                        e.durationMillis = elementsA[i].durationMillis
+                        elementsB[i].durationMillis = temp2
+                        playingA = true
+                        Log.d(TAG, "Switching to A's extractor and duration")
+
+                    }
+
                 }
 
                 val index = e.codec.dequeueInputBuffer(100)
@@ -98,7 +130,7 @@ class MultiElementsRandLooper(_statsView: TextView, _layers: MutableList<Surface
         // if all elements have a dequeued buffer that should be rendered, then render them all
         if (allOutputBuffersReady) {
             Log.d(TAG, "Rendering frame")
-            for (e in elements) {
+            for (e in elementsA) {
 
                 e.codec.releaseOutputBuffer(e.outputBufferIndex, true)
 
@@ -115,10 +147,11 @@ class MultiElementsRandLooper(_statsView: TextView, _layers: MutableList<Surface
             secondsCount++
 
             statsView.text = "Seconds elapsed: " + secondsCount +
-                        "\nFrames per second: " + goodFrames +
-                        "\nTicks waiting for time to catch up: " + catchingUpTicksThisSecond +
-                        "\nTicks missed: " + (60 - ticksCount) +
-                        "\nAverage time between ticks: " + totalTimeBetweenTicksThisSecond / ticksCount
+                    "\nFrames per second: " + goodFrames +
+                    "\nTicks waiting for time to catch up: " + catchingUpTicksThisSecond +
+                    "\nTicks missed: " + (60 - ticksCount) +
+                    "\nAverage time between ticks: " + totalTimeBetweenTicksThisSecond / ticksCount +
+                    "\nPlaying A: " + playingA
 
             catchingUpTicksThisSecond = 0
             totalTimeBetweenTicksThisSecond = 0
@@ -133,16 +166,16 @@ class MultiElementsRandLooper(_statsView: TextView, _layers: MutableList<Surface
     // dummy SimpleElements whose Surface is an invisible GL Texture
     fun addSimpleElement(context: Context, uri: Uri) {
         if (elementsA.size < 3) {
-            var newEl = SimpleElement(context, uri, layers[elementsA.size + 1])
+            var newEl = SimpleElement(context, uri, layers[elementsA.size])
             duration = newEl.durationMillis.toLong()
             //. leaving out the safety checks of duration being equal and stuff
             elementsA.add(newEl)
         }
         else {
-            var newEl = SimpleElement(context, uri, layers[elementsA.size + 1])
+            var newEl = SimpleElement(context, uri, invisibleLayers[elementsB.size])
             duration = newEl.durationMillis.toLong()
             //. leaving out the safety checks of duration being equal and stuff
-            elementsA.add(newEl)
+            elementsB.add(newEl)
         }
 
     }

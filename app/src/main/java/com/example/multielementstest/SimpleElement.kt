@@ -1,4 +1,6 @@
-package com.example.multielementstest
+package com.example.multielementstest;
+
+
 
 import android.content.Context
 import android.graphics.SurfaceTexture
@@ -12,13 +14,14 @@ import android.view.Surface
 import android.view.TextureView
 import java.io.IOException
 
-class Element(_context: Context, _uri: Uri, textureView: TextureView): TextureView.SurfaceTextureListener {
-    var listeners = mutableListOf<OnInitialisationListener>()
+// Like Element but takes a premade Surface
+public class SimpleElement (_context: Context, _uri: Uri, surface: Surface) {
+    //var listeners = mutableListOf<OnInitialisationListener>()
     val TAG = "Element"
     val context = _context
     val uri = _uri
     val formatType: MediaFormat
-    val durationMillis: Int
+    var durationMillis: Int
     // set true after a SurfaceTexture has been made available and used to configure the codec
     var initialised = false
     // will hold the index of a dequeued output buffer ready to be rendered, or else a negative
@@ -32,15 +35,16 @@ class Element(_context: Context, _uri: Uri, textureView: TextureView): TextureVi
     var bufferInfo = MediaCodec.BufferInfo()
     var extractor: MediaExtractor
     init {
+        /*
         if (!textureView.isAvailable) {
             Log.d(TAG, "Setting Element " + this.toString() + " to listen for TextureView " + textureView.toString() + "'s SurfaceTexture availability")
             textureView.surfaceTextureListener = this
         }
         else {
-            Log.d(TAG, "Building codec as SurfaceTexture is available")
-            buildCodec(textureView.surfaceTexture)
+        */
 
-        }
+
+        //}
 
 
         extractor = MediaExtractor()
@@ -61,7 +65,14 @@ class Element(_context: Context, _uri: Uri, textureView: TextureView): TextureVi
         val durationChecker = MediaMetadataRetriever()
         durationChecker.setDataSource(context, uri)
         durationMillis = Integer.parseInt(durationChecker.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION))
+
+        Log.d(TAG, "Building codec")
         codec = MediaCodec.createDecoderByType(formatType.getString(MediaFormat.KEY_MIME))
+        codec.configure(formatType, surface, null, 0)
+        Log.d(TAG, "starting codec " + codec.codecInfo)
+        codec.start()
+        initialised = true
+       //notifyInitialisationListeners()
 
 
     }
@@ -70,7 +81,7 @@ class Element(_context: Context, _uri: Uri, textureView: TextureView): TextureVi
             outputBufferIndex = codec.dequeueOutputBuffer(bufferInfo, 100)
         }
     }
-
+/*
     override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture?, width: Int, height: Int) {
         TODO("Not yet implemented")
     }
@@ -112,5 +123,5 @@ class Element(_context: Context, _uri: Uri, textureView: TextureView): TextureVi
         abstract fun onElementInitialised(e: Element)
     }
 
-
+*/
 }
